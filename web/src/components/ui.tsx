@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type CSSProperties, type ReactNode, useState } from 'react';
 import { fmtMinutes, label } from '../format';
 
 export const Card = ({ title, eyebrow, actions, children, gold, className = '' }: { title?: ReactNode; eyebrow?: string; actions?: ReactNode; children?: ReactNode; gold?: boolean; className?: string }) => (
@@ -85,7 +85,7 @@ export function LineChart({ series, height = 160 }: { series: { name: string; po
   const W = 600, H = height, P = 28;
   const x = (v: string) => P + (xs.length <= 1 ? 0 : ((W - 2 * P) * xs.indexOf(v)) / (xs.length - 1));
   const y = (v: number) => H - P - ((H - 2 * P) * v) / max;
-  const colors = ['#1d3f7a', '#b8860b', '#1f6b4f', '#b42318', '#536479', '#7c3aed'];
+  const colors = ['#2a4fd7', '#fd8d21', '#1f6b4f', '#b42318', '#7c8bd9', '#c26a00'];
   if (!xs.length) return <Empty>No data for this period</Empty>;
   return (
     <figure style={{ margin: 0 }}>
@@ -171,3 +171,11 @@ export function Table<T extends Record<string, any>>({ rows, cols, empty = 'Noth
     </div>
   );
 }
+
+/** Sinapse CRM logo with an optional context label (e.g. "Customer portal"). */
+export const Brand = ({ sub, style }: { sub?: string; style?: CSSProperties }) => (
+  <div className="brand" style={style}>
+    <img className="logo" src="/logo.png" alt="Sinapse CRM" />
+    {sub && <span className="sub">{sub}</span>}
+  </div>
+);

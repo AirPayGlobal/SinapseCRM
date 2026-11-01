@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, publicApi } from '../api';
 import { useAction } from '../hooks';
-import { ErrorBox, Field } from '../components/ui';
+import { Brand, ErrorBox, Field } from '../components/ui';
 
 export default function Login() {
   const nav = useNavigate();
@@ -25,7 +25,7 @@ export default function Login() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div className="brand" style={{ marginBottom: 6 }}><img src="/icon.svg" alt="" />SINAPSE <span>CRM</span></div>
+        <Brand />
         <p className="muted">Namibian Ports Authority — staff sign-in</p>
         <ErrorBox error={a.error} />
         {methods.entra && (

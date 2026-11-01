@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { auth, portalApi, publicApi } from '../api';
-import { Badge, Card, ErrorBox, Field, Loading, PageHead, Table } from '../components/ui';
+import { Brand, Badge, Card, ErrorBox, Field, Loading, PageHead, Table } from '../components/ui';
 import { bytes, fmtDate, fmtDateTime, label } from '../format';
 import { useAction, useLoad } from '../hooks';
 import AssistChat from './Assist';
@@ -17,7 +17,7 @@ export function PortalLayout() {
   return (
     <>
       <header className="topbar">
-        <div className="brand"><img src="/icon.svg" alt="" />NAMPORT <span>Customer portal</span></div>
+        <Brand sub="Namport customer portal" />
         <nav className="nav" aria-label="Portal">
           <NavLink to="/portal" end>My queries</NavLink>
           <NavLink to="/portal/new">Log a query</NavLink>
@@ -54,7 +54,7 @@ export function PortalLogin() {
   return (
     <div className="auth-shell">
       <form className="auth-card stack" onSubmit={submit}>
-        <div className="brand"><img src="/icon.svg" alt="" />NAMPORT <span>Customer portal</span></div>
+        <Brand sub="Namport customer portal" />
         <p className="muted">Log and track queries, manage your company's users and documents.</p>
         <ErrorBox error={a.error} />
         <Field label="Email"><input type="email" autoComplete="username" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
@@ -85,7 +85,7 @@ export function PortalRegister() {
   return (
     <div className="auth-shell">
       <div className="auth-card" style={{ width: 'min(560px, 100%)' }}>
-        <div className="brand"><img src="/icon.svg" alt="" />NAMPORT <span>Register</span></div>
+        <Brand sub="Register with Namport" />
         {done ? (
           <div className="stack">
             <div className="alert ok">Thank you. We have emailed a verification link to {f.email}. {done.join_request ? 'Your company is already registered — your company administrator or Namport will approve your access.' : 'Once your email is verified, Namport will approve your company registration and you will be notified.'}</div>
@@ -133,7 +133,7 @@ export function PortalVerify({ activate }: { activate?: boolean }) {
   return (
     <div className="auth-shell">
       <div className="auth-card stack">
-        <div className="brand"><img src="/icon.svg" alt="" />NAMPORT</div>
+        <Brand sub="Namibian Ports Authority" />
         <ErrorBox error={a.error} />
         {ok ? <div className="alert ok">Done. <Link to="/portal/login">Sign in</Link></div> : activate ? (
           <form className="stack" onSubmit={async (e) => { e.preventDefault(); if (await a.run(() => publicApi.post('/portal/verify', { token, password: pw }))) setOk(true); }}>
@@ -362,7 +362,7 @@ export function Survey() {
   return (
     <div className="auth-shell">
       <div className="auth-card stack">
-        <div className="brand"><img src="/icon.svg" alt="" />NAMPORT</div>
+        <Brand sub="Namibian Ports Authority" />
         <ErrorBox error={a.error ?? s.error} />
         {s.data && (done || s.data.responded_at ? <div className="alert ok">Thank you for your feedback.</div> : <>
           <h2>How did we handle {s.data.reference}?</h2>
@@ -386,7 +386,7 @@ export function Widget() {
   const a = useAction();
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--panel)' }}>
-      <div style={{ background: 'var(--navy)', color: '#fff', padding: '12px 14px', fontWeight: 700 }}>Namport · Ask us</div>
+      <div style={{ background: '#fff', padding: '10px 14px', borderBottom: '2px solid var(--brand-orange)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><img src="/logo.png" alt="Sinapse CRM" style={{ height: 20 }} /><span className="small" style={{ color: '#2a4fd7', fontWeight: 700 }}>Namport · Ask us</span></div>
       <div className="tabs" style={{ padding: '0 8px', margin: 0 }}>
         <button className={tab === 'assist' ? 'on' : ''} onClick={() => setTab('assist')}>Sinapse Assist</button>
         <button className={tab === 'form' ? 'on' : ''} onClick={() => setTab('form')}>Send a query</button>

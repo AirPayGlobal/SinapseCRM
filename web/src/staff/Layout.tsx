@@ -1,3 +1,4 @@
+import { Brand } from '../components/ui';
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { api, auth } from '../api';
@@ -35,7 +36,7 @@ function Shell() {
     <>
       <a className="skip" href="#main">Skip to content</a>
       <header className="topbar">
-        <div className="brand"><img src="/icon.svg" alt="" />SINAPSE <span>CRM</span></div>
+        <Brand />
         <nav className="nav" aria-label="Main">
           {can('query.read') && <NavLink to="/queue">My queue {me.counts.my_queue}</NavLink>}
           {can('query.reassign') && <NavLink to="/team">Team queue {me.counts.team_queue}</NavLink>}

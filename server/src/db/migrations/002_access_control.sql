@@ -10,19 +10,33 @@
 -- Row-level security policies then filter inside the query itself, so an API call,
 -- an export and a report are subject to exactly the same rules as a screen.
 
+-- On managed databases without CREATEROLE (e.g. Render, some Azure tiers) the dedicated role
+-- cannot be created. The policies below use FORCE ROW LEVEL SECURITY, so they still bind the
+-- (non-superuser) owner account; the application detects the missing role at start-up.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sinapse_app') THEN
     CREATE ROLE sinapse_app NOLOGIN;
   END IF;
+  -- the migrating user must be able to SET ROLE to it
+  EXECUTE format('GRANT sinapse_app TO %I', current_user);
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'sinapse_app role not created (%); row-level security will apply to the owner account', SQLERRM;
 END$$;
 
-GRANT USAGE ON SCHEMA public TO sinapse_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sinapse_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO sinapse_app;
--- The event log is append-only for the application role at the privilege level as well.
-REVOKE UPDATE, DELETE, TRUNCATE ON event_log FROM sinapse_app;
-REVOKE UPDATE, DELETE, TRUNCATE ON event_log_seal FROM sinapse_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sinapse_app') THEN
+    GRANT USAGE ON SCHEMA public TO sinapse_app;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sinapse_app;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO sinapse_app;
+    -- the event log is append-only for the application role at the privilege level as well
+    REVOKE UPDATE, DELETE, TRUNCATE ON event_log FROM sinapse_app;
+    REVOKE UPDATE, DELETE, TRUNCATE ON event_log_seal FROM sinapse_app;
+  END IF;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'could not grant to sinapse_app (%)', SQLERRM;
+END$$;
 
 CREATE OR REPLACE FUNCTION app_scope() RETURNS text LANGUAGE sql STABLE AS
 $$ SELECT coalesce(nullif(current_setting('app.scope', true), ''), 'none') $$;

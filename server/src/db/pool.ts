@@ -28,8 +28,30 @@ export interface Scope {
 export const SYSTEM: Scope = { kind: 'system' };
 export const PUBLIC: Scope = { kind: 'public' };
 
+let appRole = config.dbAppRole;
+
+/**
+ * At start-up, check that the connecting user can assume the application role. If not (a managed
+ * database without CREATEROLE), requests run as the owner account, which FORCE ROW LEVEL SECURITY
+ * still binds — unless that account is a superuser or has BYPASSRLS, which is reported loudly.
+ */
+export async function detectAppRole(log = console.warn) {
+  const r = (await pool.query(
+    `SELECT CASE WHEN $1 = '' OR NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1) THEN false
+                 ELSE pg_has_role(current_user, $1, 'MEMBER') END AS can_set,
+            (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user) AS bypasses`,
+    [appRole],
+  )).rows[0];
+  if (!r.can_set) {
+    if (appRole) log(`[db] cannot assume role "${appRole}"; running as the connecting user under FORCE ROW LEVEL SECURITY`);
+    appRole = '';
+    if (r.bypasses) log('[db] WARNING: the database user is a superuser or has BYPASSRLS, so row-level security is NOT enforced. Use a non-superuser login or create the sinapse_app role.');
+  }
+  return { appRole, bypassesRls: !r.can_set && r.bypasses };
+}
+
 async function applyScope(client: pg.PoolClient, scope: Scope) {
-  if (config.dbAppRole) await client.query(`SET LOCAL ROLE ${config.dbAppRole}`);
+  if (appRole) await client.query(`SET LOCAL ROLE ${appRole}`);
   const list = (v: string[] | '*' | undefined) => (v === '*' ? '*' : (v ?? []).join(','));
   await client.query(
     `SELECT set_config('app.scope', $1, true), set_config('app.ports', $2, true),

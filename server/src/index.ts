@@ -55,7 +55,7 @@ async function seedOnStart() {
   await withSystem(seedReference);
   if (process.env.SEED_DEMO === 'true' && (await withSystem(seedDemo))) {
     await seedDemoQueries();
-    console.log('[seed] demo data created (demo accounts use the password Sinapse!2026)');
+    console.log(`[seed] demo data created (demo accounts use ${process.env.DEMO_PASSWORD ? 'DEMO_PASSWORD' : 'the default password from the README'})`);
   }
 }
 

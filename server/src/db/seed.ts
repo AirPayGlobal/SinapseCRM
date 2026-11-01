@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { namibianPublicHolidays } from '../lib/calendar.js';
 import { systemCtx } from '../lib/context.js';
 import { intake } from '../services/intake.js';
+import { nextReference } from '../services/reference.js';
 import { DEFAULT_WORKFLOW } from '../services/workflow.js';
 import { migrate } from './migrate.js';
 import { many, one, pool, withSystem, type Tx } from './pool.js';
@@ -196,10 +197,14 @@ export async function seedReference(tx: Tx) {
 // Demonstration dataset (fictitious companies, vessels and people)
 // ---------------------------------------------------------------------------
 
+/** Password for every demo account: DEMO_PASSWORD when set (recommended on shared environments). */
+export const demoPassword = () => (process.env.DEMO_PASSWORD && process.env.DEMO_PASSWORD.length >= 10 ? process.env.DEMO_PASSWORD : 'Sinapse!2026');
+
 export async function seedDemo(tx: Tx) {
-  if (await one(tx, 'SELECT 1 FROM companies LIMIT 1')) return false;
+  // The demo client is the marker: the demo set loads once, alongside any real data already present.
+  if (await one(tx, `SELECT 1 FROM companies WHERE lower(regexp_replace(registration_no, '[^A-Za-z0-9]', '', 'g')) = 'cc20110442'`)) return false;
   const dept = Object.fromEntries((await many(tx, 'SELECT id, code FROM departments')).map((d) => [d.code, d.id]));
-  const pw = await bcrypt.hash('Sinapse!2026', 10);
+  const pw = await bcrypt.hash(demoPassword(), 10);
   const users: [string, string, string, string | null, string | null, string[], number][] = [
     ['admin@namport.com.na', 'System Administrator', 'admin', null, null, [], 20],
     ['t.shikongo@namport.com.na', 'Tuyeni Shikongo', 'agent', 'WB', 'CC', ['marine', 'terminal'], 20],
@@ -308,11 +313,10 @@ export async function seedDemo(tx: Tx) {
 
   // Findings
   const f = (await one(tx, `INSERT INTO findings (reference, title, description, finding_type_key, source, severity, owner_id, department_id, port_code, due_date, state, created_by)
-    VALUES ('FND-2026-0001', 'Customer complaints not acknowledged within 24 hours', 'Sample testing found 14% of emailed complaints were acknowledged after 24 hours.', 'internal_audit', 'Internal audit Q3', 'high', $1, $2, 'WB', current_date + 30, 'in_remediation', $3) RETURNING id`,
-    [uid['k.kaapanda@namport.com.na'], dept.CC, uid['auditor@namport.com.na']]))!;
+    VALUES ($4, 'Customer complaints not acknowledged within 24 hours', 'Sample testing found 14% of emailed complaints were acknowledged after 24 hours.', 'internal_audit', 'Internal audit Q3', 'high', $1, $2, 'WB', current_date + 30, 'in_remediation', $3) RETURNING id`,
+    [uid['k.kaapanda@namport.com.na'], dept.CC, uid['auditor@namport.com.na'], await nextReference(tx, 'FND', 'finding.reference.mask', 'FND')]))!;
   await tx.query(`INSERT INTO remediation_tasks (finding_id, title, owner_id, due_date, state) VALUES ($1,'Configure automatic acknowledgement on all channels',$2,current_date + 7,'done'),
                   ($1,'Train agents on the complaint lifecycle',$3,current_date - 2,'in_progress')`, [f.id, uid['ict@namport.com.na'], uid['k.kaapanda@namport.com.na']]);
-  await tx.query(`INSERT INTO reference_sequences (port_code, year, last_value) VALUES ('FND', extract(year FROM now())::int, 1) ON CONFLICT DO NOTHING`);
   return true;
 }
 
@@ -334,6 +338,55 @@ export async function seedDemoQueries() {
   for (const s of sample) {
     await withSystem((tx) => intake(tx, ctx, { channel: s.channel === 'phone' ? 'staff' : s.channel, subject: s.subject, body: s.body, from: { email: s.from }, externalMessageId: s.channel === 'email' ? `<seed-${Buffer.from(s.subject).toString('hex').slice(0, 24)}@demo>` : undefined }));
   }
+  await seedDemoHistory();
+}
+
+/**
+ * Closed history for the demo client so dashboards, performance figures, satisfaction and the
+ * customer timeline have something to show: cases spread over the last 30 days, answered and
+ * resolved by agents, rated by the customer (one poorly, which opens a follow-up case).
+ */
+async function seedDemoHistory() {
+  const { reply } = await import('../services/queries.js');
+  const { transition } = await import('../services/workflow.js');
+  const { recordSatisfaction } = await import('../services/satisfaction.js');
+  const { loadStaff, staffCtx } = await import('../services/auth.js');
+  const ctx = systemCtx('demo-seed');
+  const past: { from: string; subject: string; body: string; days: number; answer: string; score?: number; comment?: string; pendingCustomer?: boolean }[] = [
+    { from: 'finance@namibclearing.com.na', days: 28, subject: 'Credit note for duplicated wharfage', body: 'Invoice INV-2026-02-4410 charges wharfage twice on the same bill of lading.', answer: 'We confirmed the duplicate wharfage line and issued credit note CN-2026-0193. It will show on your next statement.', score: 5, comment: 'Quick and clear, thank you.' },
+    { from: 'ops@namibclearing.com.na', days: 24, subject: 'Reefer monitoring report for MSCU4821942', body: 'Please send the temperature log for reefer MSCU4821942 for the last 72 hours.', answer: 'The 72-hour temperature log is attached to this case in the portal. Readings stayed within -18 to -20 °C throughout.', score: 4 },
+    { from: 'hileni@namibclearing.com.na', days: 20, subject: 'Truck turned away at main gate', body: 'Our driver was refused entry this morning despite a valid booking. Please explain.', answer: 'The driver\'s port access permit had expired the previous day. Security has renewed it and the driver can collect today.', score: 2, comment: 'We were not told the permit was expiring and lost a full day.' },
+    { from: 'hileni@namibclearing.com.na', days: 15, subject: 'Berthing window for Ocean Kudu', body: 'Please confirm the berthing window for Ocean Kudu voyage 0931E.', answer: 'Ocean Kudu voyage 0931E is confirmed at Quay 8, window 06:00–18:00. The vessel call board is up to date.', score: 5 },
+    { from: 'logistics@zambezicopper.co.zm', days: 11, subject: 'Copper cathode stack dates', body: 'When can our copper cathodes be stacked for the next CMA CGM call?', answer: 'Stacking opens 72 hours before the CMA CGM Etosha window. We have reserved space in Stack 14 for your consignment.', score: 4 },
+    { from: 'ops@namibclearing.com.na', days: 6, subject: 'Missing release order for four containers', body: 'Release orders for four containers on MSC Nuria are not showing in the terminal system.', answer: 'Could you please send the customs release numbers for the four containers so we can trace the release orders?', pendingCustomer: true },
+    { from: 'finance@namibclearing.com.na', days: 3, subject: 'Statement of account for October', body: 'Please send our statement of account for October.', answer: 'Your October statement has been issued and is available in the portal document centre.' },
+  ];
+  for (const h of past) {
+    const r = await withSystem((tx) => intake(tx, ctx, { channel: 'portal', subject: h.subject, body: h.body, from: { email: h.from } }));
+    const q = r.query;
+    if (!q?.assigned_to) continue;
+    const created = new Date(Date.now() - h.days * 86_400_000 - 3 * 3_600_000);
+    await withSystem(async (tx) => {
+      const agent = staffCtx((await loadStaff(tx, q.assigned_to))!);
+      await reply(tx, agent, q.id, h.answer, { then: h.pendingCustomer ? 'pending_customer' : 'resolve', resolutionNote: h.answer });
+      if (!h.pendingCustomer && h.days > 5) await transition(tx, ctx, q.id, 'closed');
+      // move the case back in time so trends and resolution figures look like real history
+      const shift = `${h.days} days`;
+      await tx.query(
+        `UPDATE queries SET created_at = $2::timestamptz, assigned_at = $2::timestamptz + interval '2 minutes',
+                first_responded_at = CASE WHEN first_responded_at IS NOT NULL THEN $2::timestamptz + interval '95 minutes' END,
+                resolved_at = CASE WHEN resolved_at IS NOT NULL THEN $2::timestamptz + interval '26 hours' END,
+                closed_at = CASE WHEN closed_at IS NOT NULL THEN $2::timestamptz + interval '6 days' END,
+                first_response_due_at = first_response_due_at - $3::interval, resolution_due_at = resolution_due_at - $3::interval,
+                clock_paused_at = CASE WHEN clock_paused_at IS NOT NULL THEN $2::timestamptz + interval '95 minutes' END
+          WHERE id = $1`, [q.id, created, shift]);
+      await tx.query(`UPDATE interactions SET occurred_at = occurred_at - $2::interval WHERE query_id = $1`, [q.id, shift]);
+    });
+    if (h.score) {
+      const s = await withSystem((tx) => one(tx, 'SELECT token FROM satisfaction_responses WHERE query_id = $1', [q.id]));
+      if (s) await withSystem((tx) => recordSatisfaction(tx, s.token, h.score!, h.comment));
+    }
+  }
 }
 
 async function main() {
@@ -343,7 +396,7 @@ async function main() {
   if (demo) {
     const created = await withSystem(seedDemo);
     if (created) await seedDemoQueries();
-    console.log(created ? 'demo data created (password for all demo accounts: Sinapse!2026)' : 'demo data already present');
+    console.log(created ? 'demo data created' : 'demo data already present');
   }
   console.log('reference configuration seeded');
   await pool.end();

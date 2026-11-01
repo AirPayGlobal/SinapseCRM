@@ -91,12 +91,12 @@ docker compose up --build
 ```
 
 On start the app applies migrations and loads the reference configuration automatically. Set
-`SEED_DEMO=true` to load the demo data once (it is skipped if any company exists). If `JWT_SECRET` is
+`SEED_DEMO=true` to load the demo data once (it is skipped once the demo client, Namib Clearing, exists; real data already present is left alone). Set `DEMO_PASSWORD` (10+ characters) so the demo accounts don't use the published default. If `JWT_SECRET` is
 not set, a strong secret is generated on first start and kept in the database. To create or
 recover an administrator without shell access, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (10+ characters),
 deploy, sign in, then remove `ADMIN_PASSWORD`.
 
-### Demo accounts (password `Sinapse!2026`, demo data is fictitious)
+### Demo accounts (password `DEMO_PASSWORD`, or `Sinapse!2026` if unset; demo data is fictitious)
 
 | Account | Role |
 |---|---|

@@ -1,0 +1,15 @@
+{
+  "name": "sinapse-crm",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Sinapse CRM — port-operations customer management system (Namport implementation)",
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "dev": "npm run dev -w server & npm run dev -w web",
+    "build": "npm run build -w server && npm run build -w web",
+    "migrate": "npm run migrate -w server",
+    "seed": "npm run seed -w server",
+    "test": "npm test -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+  }
+}

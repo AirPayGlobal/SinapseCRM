@@ -136,7 +136,9 @@ queriesRouter.get('/:id/assist', staff('query.read'), ah(async (req, res) => {
     const q = await one(tx, 'SELECT * FROM queries WHERE id = $1', [req.params.id]);
     if (!q) throw notFound();
     const text = `${q.subject} ${q.description}`;
-    const articles = await retrieve(tx, text, 3);
+    const { getSetting } = await import('../services/settings.js');
+    const gate = Number(await getSetting(tx, 'assist.confidence_threshold')) * 0.8;
+    const articles = (await retrieve(tx, text, 3)).filter((a) => a.score >= gate);
     const resolved = await many(tx,
       `SELECT id, reference, subject, description, resolution_note, resolved_at FROM queries
         WHERE resolution_note IS NOT NULL AND id <> $1 AND (query_type_key = $2 OR $2 IS NULL) ORDER BY resolved_at DESC LIMIT 300`, [q.id, q.query_type_key]);

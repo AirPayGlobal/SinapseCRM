@@ -1,0 +1,31 @@
+# Local / evaluation environment. Production runs single-tenant on managed infrastructure (see README).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sinapse_owner
+      POSTGRES_PASSWORD: sinapse
+      POSTGRES_DB: sinapse
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sinapse_owner -d sinapse"]
+      interval: 5s
+      retries: 10
+  clamav:
+    image: clamav/clamav:stable
+    profiles: [av]
+  app:
+    build: .
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://sinapse_owner:sinapse@db:5432/sinapse
+      JWT_SECRET: change-me-in-production-to-a-long-random-value
+      PUBLIC_URL: http://localhost:4000
+      OBJECT_STORAGE_DIR: /var/lib/sinapse/storage
+      # CLAMAV_HOST: clamav    # enable with: docker compose --profile av up
+    ports: ["4000:4000"]
+    volumes: [storage:/var/lib/sinapse/storage]
+volumes:
+  pgdata:
+  storage:

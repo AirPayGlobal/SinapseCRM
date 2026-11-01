@@ -137,7 +137,8 @@ queriesRouter.get('/:id/assist', staff('query.read'), ah(async (req, res) => {
     if (!q) throw notFound();
     const text = `${q.subject} ${q.description}`;
     const { getSetting } = await import('../services/settings.js');
-    const gate = Number(await getSetting(tx, 'assist.confidence_threshold')) * 0.8;
+    // Staff suggestions are advisory, so the gate is looser than the customer-facing one, but still drops noise
+    const gate = Number(await getSetting(tx, 'assist.confidence_threshold')) * 0.55;
     const articles = (await retrieve(tx, text, 3)).filter((a) => a.score >= gate);
     const resolved = await many(tx,
       `SELECT id, reference, subject, description, resolution_note, resolved_at FROM queries

@@ -13,6 +13,8 @@ ENV NODE_ENV=production PORT=4000
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
+# npm keeps some workspace dependencies (e.g. express 4, pg) in the workspace's own node_modules
+COPY --from=build /app/server/node_modules ./server/node_modules
 COPY --from=build /app/server/package.json server/
 COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/server/src/db/migrations server/dist/db/migrations

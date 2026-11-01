@@ -90,9 +90,9 @@ With Docker:
 docker compose up --build
 ```
 
-```bash
-docker compose exec app node dist/db/seed.js --demo
-```
+On start the app applies migrations and loads the reference configuration automatically. Set
+`SEED_DEMO=true` to load the demo data once (it is skipped if any company exists). If `JWT_SECRET` is
+not set, a strong secret is generated on first start and kept in the database.
 
 ### Demo accounts (password `Sinapse!2026`, demo data is fictitious)
 
